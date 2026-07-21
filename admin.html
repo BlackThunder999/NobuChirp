@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель | Sibiria Airlines</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #0a0e17, #1a1f2e);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        .card {
+            background: rgba(20,25,40,0.95);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid rgba(100,150,255,0.2);
+            text-align: center;
+            min-width: 350px;
+        }
+        h2 { margin-bottom: 30px; color: #ff4444; }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.1em;
+        }
+        .btn-crash { background: #cc0000; color: #fff; }
+        .btn-crash:hover { background: #ff0000; }
+        .btn-land { background: #00aa44; color: #fff; }
+        .btn-land:hover { background: #00cc55; }
+        .back-btn { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: #fff; }
+        .stats-display { font-size: 1.2em; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="card" id="login">
+        <h2>⚙️ Доступ запрещён</h2>
+        <input type="password" id="passInput" placeholder="Пароль администратора">
+        <button onclick="checkPass()" style="background:#0066cc;color:#fff;">Войти</button>
+        <p id="error" style="color:#ff4444;margin-top:10px;"></p>
+        <a href="index.html" style="display:block;margin-top:20px;color:#7eb8ff;">← На главную</a>
+    </div>
+    <div class="card" id="panel" style="display:none;">
+        <h2>⚙️ Админ-панель</h2>
+        <div class="stats-display">
+            <p>💥 Катастрофы: <strong id="crashCount">0</strong></p>
+            <p>✅ Удачные посадки: <strong id="landCount">0</strong></p>
+        </div>
+        <button class="btn-crash" onclick="increment('crashes')">+1 Катастрофа</button>
+        <button class="btn-land" onclick="increment('successful_landings')">+1 Удачная посадка</button>
+        <button class="back-btn" onclick="location.href='index.html'">← На главную</button>
+    </div>
+    <script>
+        const supabase = window.supabase.createClient(
+            'https://iljsednetiogjtowlexo.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlsanNlZG5ldGlvZ2p0b3dsZXhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5MjcyOTUsImV4cCI6MjA5OTUwMzI5NX0.vkoXtCc_NnFfLqQqjMVlLxOcRZ-cTgjeIIBi2nikbWs'
+        );
+
+        function checkPass() {
+            if (document.getElementById('passInput').value === 'Sibiria2026') {
+                document.getElementById('login').style.display = 'none';
+                document.getElementById('panel').style.display = 'block';
+                loadStats();
+            } else {
+                document.getElementById('error').textContent = 'Неверный пароль!';
+            }
+        }
+
+        async function loadStats() {
+            const { data } = await supabase.from('stats').select('*').single();
+            document.getElementById('crashCount').textContent = data?.crashes || 0;
+            document.getElementById('landCount').textContent = data?.successful_landings || 0;
+        }
+
+        async function increment(field) {
+            const { data } = await supabase.from('stats').select(field).single();
+            const newVal = (data?.[field] || 0) + 1;
+            await supabase.from('stats').update({ [field]: newVal }).eq('id', 1);
+            loadStats();
+        }
+    </script>
+</body>
+</html>

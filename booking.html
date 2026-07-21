@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бронирование | Sibiria Airlines</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #0a0e17, #1a1f2e);
+            min-height: 100vh;
+            color: #fff;
+            padding: 20px;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            padding: 30px 0;
+        }
+        .header h1 {
+            font-size: 2em;
+            background: linear-gradient(to bottom, #fff, #7eb8ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .card {
+            background: rgba(20,25,40,0.95);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(100,150,255,0.2);
+        }
+        select, button {
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 1em;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button {
+            background: #0066cc;
+            border-color: #0066cc;
+            font-weight: 600;
+        }
+        button:hover { background: #0077ee; }
+        .seat-map {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            max-width: 300px;
+            margin: 20px auto;
+        }
+        .seat {
+            aspect-ratio: 1;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.3);
+            background: #1e2a3a;
+            transition: 0.2s;
+        }
+        .seat:hover { background: #2a3a4a; transform: scale(1.05); }
+        .seat.booked { background: #cc3333; cursor: not-allowed; }
+        .seat.selected { background: #00aa44; border-color: #00ff66; }
+        .seat.available { background: #1e2a3a; }
+        .flight-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .back-btn {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.1); }
+        #message {
+            padding: 10px;
+            border-radius: 10px;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .success { background: #004422; }
+        .error { background: #440022; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛫 Бронирование рейса</h1>
+            <a href="index.html" class="back-btn" style="display:inline-block;margin-top:10px;">← На главную</a>
+        </div>
+        <div class="card">
+            <label>Выберите рейс:</label>
+            <select id="flightSelect" onchange="loadSeats()">
+                <option value="">-- Загрузка рейсов --</option>
+            </select>
+        </div>
+        <div class="card" id="flightDetails" style="display:none;">
+            <h3>Информация о рейсе</h3>
+            <div class="flight-info" id="info"></div>
+            <h4 style="margin-top:20px;">Схема салона (242 места)</h4>
+            <div class="seat-map" id="seatMap"></div>
+            <p id="selectedSeat" style="text-align:center;margin:10px 0;">Выберите место</p>
+            <button onclick="bookSeat()" id="bookBtn" disabled>Забронировать место</button>
+            <div id="message"></div>
+        </div>
+    </div>
+    <script>
+        const supabase = window.supabase.createClient(
+            'https://iljsednetiogjtowlexo.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlsanNlZG5ldGlvZ2p0b3dsZXhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5MjcyOTUsImV4cCI6MjA5OTUwMzI5NX0.vkoXtCc_NnFfLqQqjMVlLxOcRZ-cTgjeIIBi2nikbWs'
+        );
+        let selectedFlight = null;
+        let selectedSeatNum = null;
+
+        async function loadFlights() {
+            const { data: flights } = await supabase.from('flights').select('*').eq('status', 'scheduled');
+            const select = document.getElementById('flightSelect');
+            select.innerHTML = '<option value="">-- Выберите рейс --</option>';
+            if (flights) {
+                flights.forEach(f => {
+                    select.innerHTML += `<option value="${f.id}">${f.flight_number}: ${f.departure} → ${f.arrival}</option>`;
+                });
+            }
+        }
+
+        async function loadSeats() {
+            const id = document.getElementById('flightSelect').value;
+            if (!id) return;
+            selectedFlight = id;
+            document.getElementById('flightDetails').style.display = 'block';
+            const { data: flight } = await supabase.from('flights').select('*').eq('id', id).single();
+            if (flight) {
+                document.getElementById('info').innerHTML = `
+                    <div><strong>Рейс:</strong> ${flight.flight_number}</div>
+                    <div><strong>Откуда:</strong> ${flight.departure}</div>
+                    <div><strong>Куда:</strong> ${flight.arrival}</div>
+                    <div><strong>Вылет:</strong> ${new Date(flight.departure_time).toLocaleString()}</div>
+                `;
+            }
+            const { data: booked } = await supabase.from('bookings').select('seat_number').eq('flight_id', id);
+            const bookedSeats = booked ? booked.map(b => b.seat_number) : [];
+            const map = document.getElementById('seatMap');
+            map.innerHTML = '';
+            for (let row = 1; row <= 41; row++) {
+                for (let col of ['A','B','C','D','E','F']) {
+                    const seat = row + col;
+                    const div = document.createElement('div');
+                    div.className = 'seat ' + (bookedSeats.includes(seat) ? 'booked' : 'available');
+                    div.textContent = seat;
+                    if (!bookedSeats.includes(seat)) {
+                        div.onclick = () => {
+                            document.querySelectorAll('.seat.selected').forEach(s => s.classList.remove('selected'));
+                            div.classList.add('selected');
+                            selectedSeatNum = seat;
+                            document.getElementById('selectedSeat').textContent = 'Выбрано место: ' + seat;
+                            document.getElementById('bookBtn').disabled = false;
+                        };
+                    }
+                    map.appendChild(div);
+                }
+            }
+        }
+
+        async function bookSeat() {
+            if (!selectedFlight || !selectedSeatNum) return;
+            const name = prompt('Имя пассажира (или оставьте пустым):') || 'Пассажир';
+            const { error } = await supabase.from('bookings').insert({
+                flight_id: selectedFlight,
+                seat_number: selectedSeatNum,
+                passenger_name: name
+            });
+            const msg = document.getElementById('message');
+            if (error) {
+                msg.className = 'error';
+                msg.textContent = '❌ Ошибка: ' + error.message;
+            } else {
+                msg.className = 'success';
+                msg.textContent = '✅ Место ' + selectedSeatNum + ' успешно забронировано!';
+                selectedSeatNum = null;
+                document.getElementById('bookBtn').disabled = true;
+                loadSeats();
+            }
+        }
+
+        loadFlights();
+    </script>
+</body>
+</html>
